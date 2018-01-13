@@ -8,6 +8,13 @@
 #include "file.h"
 #include "fcntl.h"
 #include "sysfunc.h"
+#include "ProcessInfo.h"
+#include "spinlock.h"
+
+extern struct {
+  struct spinlock lock;
+  struct proc proc[NPROC];
+} ptable;
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -389,4 +396,31 @@ sys_pipe(void)
   fd[0] = fd0;
   fd[1] = fd1;
   return 0;
+}
+
+int 
+sys_getprocs(void){
+  int num=0;
+  struct ProcessInfo* p;
+  if(argptr(0, (void*)&p, sizeof(*p)) < 0)
+    return -1;
+
+  struct proc *p1;
+  acquire(&ptable.lock);
+  for(p1 = ptable.proc; p1 < &ptable.proc[NPROC]; p1++){
+    if(p1->state != 0){
+   	p->pid = p1->pid;
+        if(p1->parent == NULL)
+          p->ppid = -1;
+        else
+          p->ppid = p1->parent->pid;
+        p->state = p1->state;
+        p->sz = p1->sz;
+        safestrcpy(p->name, p1->name, sizeof(p1->name));
+        num++;
+        p++;
+    }
+  }
+  release(&ptable.lock);
+  return num;
 }
